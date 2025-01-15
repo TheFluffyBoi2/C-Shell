@@ -7,32 +7,37 @@
 #include <sys/types.h>
 #include <errno.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #define MAX_SIZE 50
 #define MAX_COMMANDS 5000
 #define MAX_ARGUMENTS 10
 
-void pipe_number(int* pipe_nr, int argument_nr, char* arguments[MAX_ARGUMENTS]) {
+void special_characters(int* redirect_nr, int* pipe_nr, int argument_nr, char* arguments[]) {
 	for (int i = 0; i < argument_nr; ++i) {
 		if (strcmp(arguments[i], "|") == 0) {
 			(*pipe_nr)++;
 		}
+		if (strcmp(arguments[i], ">") == 0) {
+			(*redirect_nr)++;
+		}
 	}
 }
 
-void free_arguments(int arg_nr, char* arguments[MAX_ARGUMENTS]) {
+void free_arguments(int arg_nr, char* arguments[]) {
 	for (int i = 0; i < arg_nr; ++i) {
 		free(arguments[i]);
 	}
 }
 
-void exit_shell(int command_nr, char* all_commands[MAX_COMMANDS]) {
+void exit_shell(int command_nr, char* all_commands[]) {
 	for (int i = 0; i <= command_nr; ++i) {
 		free(all_commands[i]);
 	}
 }
 
-int parsing(int* arg_nr, char* arguments[MAX_ARGUMENTS], char* command) {
+int parsing(int* arg_nr, char* arguments[], char* command) {
 	char* tocken = strtok(command, " ");
 	while (tocken != NULL) {
 		if (*arg_nr > MAX_ARGUMENTS) {
@@ -77,10 +82,49 @@ int cd(int argument_nr, char* arguments[]) {
 	}
 }
 
-void history(int command_nr, char* all_commands[MAX_COMMANDS]) {
+void history(int command_nr, char* all_commands[]) {
 	printf("HISTORY:\n");
 	for (int i = 0; i <= command_nr; ++i) {
 		printf("%d %s\n", i, all_commands[i]);
+	}
+}
+
+int execute_redirect_command(int argument_nr, char* arguments[]) {
+	char* commands[argument_nr + 1];
+	char* f_output = NULL;
+	int fd_output;
+	pid_t pid = fork();
+	int index = 0;
+	for (int i = 0; i < argument_nr; ++i) {
+		if (strcmp(arguments[i], ">") != 0) {
+			commands[index] = arguments[i];
+			index++;
+		}
+		else {
+			commands[index] = NULL;
+			f_output = arguments[i+1];
+			break;
+		}
+	}
+	fd_output = open(f_output, O_RDWR | O_CREAT, 0777);
+	if (fd_output < 0) {
+		perror("Failed to open the file");
+		return errno;
+	}
+	if (pid < 0) {
+		perror("Fork failed");
+		return errno;
+	}
+	else if (pid == 0) {
+		dup2(fd_output, 1);
+		if (execvp(commands[0], commands) < 0) {
+			perror("Invalid command");
+			exit(0);
+		}
+	}
+	else {
+		wait(NULL);
+		close(fd_output);
 	}
 }
 
@@ -220,7 +264,8 @@ int main(int argc, char* argv[]) {
 		arguments[argument_nr] = NULL;
 
 		int pipe_nr = 0;
-		pipe_number(&pipe_nr, argument_nr, arguments);
+		int redirect_nr = 0;
+		special_characters(&redirect_nr, &pipe_nr, argument_nr, arguments);
 
 		arguments[argument_nr + 1] = NULL;
 
@@ -229,9 +274,12 @@ int main(int argc, char* argv[]) {
 		if (strcmp(arguments[0], "cd") == 0) {
 			cd(argument_nr, arguments);
 		}
-		 else if (pipe_nr > 0) {
+		else if (pipe_nr > 0) {
 		 	execute_pipe_commands(pipe_nr, argument_nr, arguments);
-		 }
+		}
+		else if (redirect_nr == 1) {
+			execute_redirect_command(argument_nr, arguments);
+		}
 		else {
 			execute_command(argument_nr, arguments);
 		}
