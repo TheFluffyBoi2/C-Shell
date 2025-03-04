@@ -1,4 +1,9 @@
-# SO-Project
+# <p align = "center">SO-Project</p>
+
+<p align="center">
+  <img src="https://i.imgur.com/w3EbQNN.png" alt="Socialy logo">
+</p>
+
 Basic shell made in C for the Operating System course.
 
 ## Table of Contents:
