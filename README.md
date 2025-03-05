@@ -1,4 +1,4 @@
-# <p align = "center">SO-Project</p>
+# <p align = "center">C-Shell (SO-Project)</p>
 
 <p align="center">
   <img src="https://i.imgur.com/w3EbQNN.png" alt="Socialy logo">
